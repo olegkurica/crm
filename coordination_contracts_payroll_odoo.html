@@ -1,0 +1,377 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Модуль координації в Odoo: контракти, табелі годин, виплати зарплат</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <h2 class="sr-only">Модуль координації в Odoo: контракти, табелі годин, виплати зарплат</h2>
+
+
+<div class="pg">
+  <div style="margin-bottom:1.25rem;">
+    <p style="font-size:13px;color:var(--color-text-secondary);margin:0 0 3px;">Відділ координації — Odoo</p>
+    <div style="font-size:20px;font-weight:500;margin:0 0 4px;">Контракти, табелі, виплати</div>
+    <p style="font-size:12px;color:var(--color-text-secondary);margin:0;">Бригадир → Координатор → Головний координатор</p>
+  </div>
+
+  <div class="tabs">
+    <button class="tb on" onclick="show('structure')">Структура ролей</button>
+    <button class="tb" onclick="show('contract')">Контракт в Odoo</button>
+    <button class="tb" onclick="show('timesheet')">Табель (бригадир)</button>
+    <button class="tb" onclick="show('payroll')">Розрахунок зарплат</button>
+    <button class="tb" onclick="show('excel')">Перенос з Excel</button>
+    <button class="tb" onclick="show('setup')">Що встановити</button>
+  </div>
+
+  <div class="sec vis" id="s-structure">
+    <div class="g3" style="margin-bottom:14px;">
+      <div class="blk">
+        <div class="row"><span class="badge b-gray">Роль 1</span></div>
+        <h4>Бригадир</h4>
+        <p>Веде 1 контракт. Щодня вносить години кожного працівника, фіксує завдатки, покарання, доплати. Бачить тільки свій контракт.</p>
+        <div class="pill-row">
+          <span class="tag">1 контракт</span>
+          <span class="tag">Табель годин</span>
+          <span class="tag">Завдатки/штрафи</span>
+        </div>
+      </div>
+      <div class="blk">
+        <div class="row"><span class="badge b-blue">Роль 2</span></div>
+        <h4>Координатор</h4>
+        <p>Веде кілька контрактів. Бачить табелі всіх своїх бригадирів, перевіряє і затверджує місячні виплати. Бачить тільки свої контракти.</p>
+        <div class="pill-row">
+          <span class="tag">N контрактів</span>
+          <span class="tag">Перевірка табелів</span>
+          <span class="tag">Затвердження виплат</span>
+        </div>
+      </div>
+      <div class="blk">
+        <div class="row"><span class="badge b-purple">Роль 3</span></div>
+        <h4>Головний координатор</h4>
+        <p>Бачить усі контракти всіх координаторів. Зведений дашборд по виплатах, перегляд і виправлення будь-якого табеля, звіти по місяцям.</p>
+        <div class="pill-row">
+          <span class="tag">Всі контракти</span>
+          <span class="tag">Зведений звіт</span>
+          <span class="tag">Повний доступ</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="row"><span class="badge b-teal">Модель даних</span><span style="font-size:14px;font-weight:500;">Як пов'язані об'єкти в Odoo</span></div>
+      <div class="g2">
+        <div>
+          <div class="step"><div class="sn">1</div><div class="sc"><h4>Контракт (project.project або custom)</h4><p>Назва клієнта, дата початку/кінця, ставка за годину, валюта. Прив'язаний до компанії-клієнта в CRM. Поле "Координатор" і "Бригадир".</p></div></div>
+          <div class="step"><div class="sn">2</div><div class="sc"><h4>Список працівників на контракті</h4><p>Many2many зв'язок: контракт ↔ список hr.employee. Кожен найнятий кандидат прив'язується до конкретного контракту.</p></div></div>
+          <div class="step"><div class="sn">3</div><div class="sc"><h4>Табель (account.analytic.line)</h4><p>Один запис = 1 день × 1 працівник × кількість годин. Поля: дата, працівник, контракт, години, нотатка бригадира.</p></div></div>
+        </div>
+        <div>
+          <div class="step"><div class="sn">4</div><div class="sc"><h4>Фінансові коригування</h4><p>Окрема модель або additional_line в табелі: тип (завдаток / штраф / доплата), сума, дата, коментар, хто вніс.</p></div></div>
+          <div class="step"><div class="sn">5</div><div class="sc"><h4>Місячний розрахунок зарплати</h4><p>hr.payslip або custom: сума = (години × ставка) + доплати − завдатки − штрафи. Статус: Чернетка → Перевірено → Затверджено → Виплачено.</p></div></div>
+          <div class="step"><div class="sn">6</div><div class="sc"><h4>Архів виплат</h4><p>Після затвердження — заблокований запис. Зміни тільки через коригування. Повна трасованість хто/коли/що змінив.</p></div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="sec" id="s-contract">
+    <div class="warn"><p>Це макет того, як виглядає картка контракту в Odoo після налаштування. Один контракт = один клієнт + список людей + бригадир.</p></div>
+
+    <div class="contract-card" style="border-color: var(--color-border-info);">
+      <div class="contract-header">
+        <span class="contract-title">Контракт #2024-17 — Schneider GmbH</span>
+        <span class="badge b-teal">Активний</span>
+      </div>
+      <div class="contract-meta">Бригадир: Василь Коваль &nbsp;·&nbsp; Координатор: Оксана Мельник &nbsp;·&nbsp; 01.01.2025 — 31.12.2025</div>
+      <div class="mini-stats">
+        <div class="mini-stat"><div class="mv">14</div><div class="ml">працівників</div></div>
+        <div class="mini-stat"><div class="mv">€12.50</div><div class="ml">ставка/год</div></div>
+        <div class="mini-stat"><div class="mv">апр 2025</div><div class="ml">поточний місяць</div></div>
+        <div class="mini-stat"><div class="mv" style="color:#0F6E56;">Затверджено</div><div class="ml">статус табеля</div></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="row"><span class="badge b-blue">Поля контракту в Odoo (через Studio)</span></div>
+      <div style="overflow-x:auto;">
+        <table class="tbl">
+          <thead><tr><th style="width:30%;">Поле</th><th style="width:25%;">Тип в Odoo</th><th>Опис</th></tr></thead>
+          <tbody>
+            <tr><td class="bold">Назва контракту</td><td>Char</td><td>Напр. "Schneider GmbH — лінія 3"</td></tr>
+            <tr><td class="bold">Клієнт</td><td>Many2one → res.partner</td><td>Зв'язок з CRM компанією</td></tr>
+            <tr><td class="bold">Координатор</td><td>Many2one → res.users</td><td>Відповідальний координатор</td></tr>
+            <tr><td class="bold">Бригадир</td><td>Many2one → res.users</td><td>Хто вносить табель</td></tr>
+            <tr><td class="bold">Працівники</td><td>Many2many → hr.employee</td><td>Список людей на контракті</td></tr>
+            <tr><td class="bold">Ставка (€/год)</td><td>Float</td><td>Базова ставка для розрахунку</td></tr>
+            <tr><td class="bold">Дата початку/кінця</td><td>Date</td><td>Термін контракту</td></tr>
+            <tr><td class="bold">Статус</td><td>Selection</td><td>Активний / Завершений / Призупинений</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="row"><span class="badge b-amber">Фінансові коригування на контракті</span></div>
+      <div style="overflow-x:auto;">
+        <table class="tbl">
+          <thead><tr><th>Тип</th><th>Поле суми</th><th>Вплив на зарплату</th><th>Хто вносить</th></tr></thead>
+          <tbody>
+            <tr><td class="bold">Завдаток</td><td>Float (−)</td><td class="minus">Мінус із суми виплати</td><td>Бригадир</td></tr>
+            <tr><td class="bold">Штраф / покарання</td><td>Float (−)</td><td class="minus">Мінус із суми виплати</td><td>Бригадир</td></tr>
+            <tr><td class="bold">Доплата / бонус</td><td>Float (+)</td><td class="plus">Плюс до суми виплати</td><td>Бригадир / Координатор</td></tr>
+            <tr><td class="bold">Компенсація витрат</td><td>Float (+)</td><td class="plus">Плюс до суми виплати</td><td>Координатор</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p style="font-size:12px;color:var(--color-text-secondary);margin:10px 0 0;">Кожен запис має: дату, коментар, хто створив, прив'язку до місяця → повна трасованість.</p>
+    </div>
+  </div>
+
+  <div class="sec" id="s-timesheet">
+    <div class="warn"><p>Бригадир входить у систему і бачить тільки свій контракт і список своїх працівників. Він не має доступу до інших контрактів або фінансових підсумків.</p></div>
+
+    <div class="card">
+      <div class="contract-header">
+        <span style="font-size:14px;font-weight:500;">Контракт: Schneider GmbH — квітень 2025</span>
+        <span class="badge b-amber">Чернетка</span>
+      </div>
+      <div style="font-size:12px;color:var(--color-text-secondary);margin-bottom:12px;">Бригадир: Василь Коваль &nbsp;·&nbsp; Заповніть години за кожен день</div>
+
+      <div style="overflow-x:auto;margin-bottom:12px;">
+        <table class="tbl">
+          <thead>
+            <tr>
+              <th style="width:28%;">Працівник</th>
+              <th class="num">1 кв</th><th class="num">2 кв</th><th class="num">3 кв</th><th class="num">4 кв</th><th class="num">5 кв</th>
+              <th class="num" style="background:var(--color-background-warning,#FAEEDA);">Сума</th>
+            </tr>
+          </thead>
+          <tbody id="timesheet-body">
+            <tr>
+              <td><div class="name" style="font-weight:500;font-size:12px;">Іванченко П.</div></td>
+              <td class="num"><input class="hrs-input" type="number" min="0" max="24" step="0.5" value="8" onchange="recalc()"></td>
+              <td class="num"><input class="hrs-input" type="number" min="0" max="24" step="0.5" value="8" onchange="recalc()"></td>
+              <td class="num"><input class="hrs-input" type="number" min="0" max="24" step="0.5" value="0" onchange="recalc()"></td>
+              <td class="num"><input class="hrs-input" type="number" min="0" max="24" step="0.5" value="8" onchange="recalc()"></td>
+              <td class="num"><input class="hrs-input" type="number" min="0" max="24" step="0.5" value="8" onchange="recalc()"></td>
+              <td class="num bold" id="r0">32</td>
+            </tr>
+            <tr>
+              <td><div class="name" style="font-weight:500;font-size:12px;">Сидоренко А.</div></td>
+              <td class="num"><input class="hrs-input" type="number" min="0" max="24" step="0.5" value="8" onchange="recalc()"></td>
+              <td class="num"><input class="hrs-input" type="number" min="0" max="24" step="0.5" value="8" onchange="recalc()"></td>
+              <td class="num"><input class="hrs-input" type="number" min="0" max="24" step="0.5" value="8" onchange="recalc()"></td>
+              <td class="num"><input class="hrs-input" type="number" min="0" max="24" step="0.5" value="6" onchange="recalc()"></td>
+              <td class="num"><input class="hrs-input" type="number" min="0" max="24" step="0.5" value="8" onchange="recalc()"></td>
+              <td class="num bold" id="r1">38</td>
+            </tr>
+            <tr>
+              <td><div class="name" style="font-weight:500;font-size:12px;">Петренко В.</div></td>
+              <td class="num"><input class="hrs-input" type="number" min="0" max="24" step="0.5" value="0" onchange="recalc()"></td>
+              <td class="num"><input class="hrs-input" type="number" min="0" max="24" step="0.5" value="8" onchange="recalc()"></td>
+              <td class="num"><input class="hrs-input" type="number" min="0" max="24" step="0.5" value="8" onchange="recalc()"></td>
+              <td class="num"><input class="hrs-input" type="number" min="0" max="24" step="0.5" value="8" onchange="recalc()"></td>
+              <td class="num"><input class="hrs-input" type="number" min="0" max="24" step="0.5" value="8" onchange="recalc()"></td>
+              <td class="num bold" id="r2">32</td>
+            </tr>
+            <tr class="total-row">
+              <td class="bold">Всього годин</td>
+              <td class="num bold" id="c0">24</td>
+              <td class="num bold" id="c1">24</td>
+              <td class="num bold" id="c2">16</td>
+              <td class="num bold" id="c3">22</td>
+              <td class="num bold" id="c4">24</td>
+              <td class="num bold" id="ctotal" style="color:var(--color-text-info);">102</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;">
+        <button style="font-size:12px;padding:6px 14px;" onclick="sendPrompt('Як налаштувати табель годин для бригадира в Odoo Timesheets?')">Зберегти чернетку ↗</button>
+        <button style="font-size:12px;padding:6px 14px;" onclick="sendPrompt('Як бригадир додає завдаток або штраф в Odoo?')">Додати завдаток / штраф ↗</button>
+      </div>
+      <p style="font-size:11px;color:var(--color-text-secondary);margin:8px 0 0;">Показано перші 5 днів як приклад. В реальній системі — повний місяць або вигляд по тижнях.</p>
+    </div>
+
+    <div class="card">
+      <div class="row"><span class="badge b-coral">Завдатки та коригування за квітень</span></div>
+      <table class="tbl">
+        <thead><tr><th>Працівник</th><th>Тип</th><th>Дата</th><th class="num">Сума</th><th>Коментар</th></tr></thead>
+        <tbody>
+          <tr><td>Іванченко П.</td><td><span class="badge b-amber">Завдаток</span></td><td>05.04</td><td class="num minus">−200 zł</td><td>Готівка</td></tr>
+          <tr><td>Сидоренко А.</td><td><span class="badge b-coral">Штраф</span></td><td>10.04</td><td class="num minus">−50 zł</td><td>Запізнення</td></tr>
+          <tr><td>Петренко В.</td><td><span class="badge b-green">Доплата</span></td><td>15.04</td><td class="num plus">+150 zł</td><td>Нічна зміна</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="sec" id="s-payroll">
+    <div class="warn"><p>Ось чому зараз в Excel не сходиться: завдатки, штрафи й доплати вносяться окремо і ніхто не бачить цілісну картину. В Odoo — все в одному місці, формула розраховується автоматично.</p></div>
+
+    <div class="card">
+      <div class="row"><span class="badge b-purple">Розрахунок зарплати — Іванченко П. — квітень 2025</span></div>
+      <div id="payslip">
+        <div class="calc-row"><span>Відпрацьовано годин</span><span id="hrs-total">160</span></div>
+        <div class="calc-row"><span>Ставка за годину</span><span>€12.50</span></div>
+        <div class="calc-row"><span class="plus">Базова сума</span><span class="plus" id="base">€2 000.00</span></div>
+        <div class="calc-row"><span class="plus">Доплати / бонуси</span><span class="plus" id="bonus">+€150.00</span></div>
+        <div class="calc-row"><span class="minus">Завдатки</span><span class="minus" id="advance">−€200.00</span></div>
+        <div class="calc-row"><span class="minus">Штрафи</span><span class="minus" id="fine">−€50.00</span></div>
+        <div class="calc-row total"><span>До виплати</span><span id="net" style="color:var(--color-text-info);font-size:16px;">€1 900.00</span></div>
+      </div>
+      <hr class="div">
+      <div style="font-size:12px;color:var(--color-text-secondary);margin-bottom:10px;">Симулятор: змініть параметри</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px;">
+        <div><label style="font-size:12px;color:var(--color-text-secondary);">Годин відпрацьовано</label><br><input type="number" id="inp-hrs" value="160" style="width:100%;margin-top:4px;" oninput="calcPay()"></div>
+        <div><label style="font-size:12px;color:var(--color-text-secondary);">Ставка (€/год)</label><br><input type="number" id="inp-rate" value="12.5" step="0.5" style="width:100%;margin-top:4px;" oninput="calcPay()"></div>
+        <div><label style="font-size:12px;color:var(--color-text-secondary);">Доплати (€)</label><br><input type="number" id="inp-bonus" value="150" style="width:100%;margin-top:4px;" oninput="calcPay()"></div>
+        <div><label style="font-size:12px;color:var(--color-text-secondary);">Завдатки (€)</label><br><input type="number" id="inp-adv" value="200" style="width:100%;margin-top:4px;" oninput="calcPay()"></div>
+        <div><label style="font-size:12px;color:var(--color-text-secondary);">Штрафи (€)</label><br><input type="number" id="inp-fine" value="50" style="width:100%;margin-top:4px;" oninput="calcPay()"></div>
+      </div>
+      <button onclick="sendPrompt('Як налаштувати автоматичний розрахунок зарплати в Odoo Payroll з урахуванням завдатків і штрафів?')">Детальніше про Odoo Payroll ↗</button>
+    </div>
+
+    <div class="card">
+      <div class="row"><span class="badge b-teal">Зведений звіт по контракту — Schneider GmbH — квітень</span></div>
+      <div style="overflow-x:auto;">
+        <table class="tbl">
+          <thead><tr><th>Працівник</th><th class="num">Годин</th><th class="num">Базова</th><th class="num">Доплати</th><th class="num">Вирахування</th><th class="num bold">До виплати</th><th>Статус</th></tr></thead>
+          <tbody>
+            <tr><td>Іванченко П.</td><td class="num">160</td><td class="num">€2 000</td><td class="num plus">+€150</td><td class="num minus">−€250</td><td class="num bold">€1 900</td><td><span class="badge b-teal">Затверджено</span></td></tr>
+            <tr><td>Сидоренко А.</td><td class="num">168</td><td class="num">€2 100</td><td class="num">—</td><td class="num minus">−€50</td><td class="num bold">€2 050</td><td><span class="badge b-amber">Перевірка</span></td></tr>
+            <tr><td>Петренко В.</td><td class="num">152</td><td class="num">€1 900</td><td class="num plus">+€200</td><td class="num">—</td><td class="num bold">€2 100</td><td><span class="badge b-amber">Перевірка</span></td></tr>
+            <tr class="total-row"><td class="bold">Разом</td><td class="num bold">480</td><td class="num bold">€6 000</td><td class="num bold plus">+€350</td><td class="num bold minus">−€300</td><td class="num bold" style="color:var(--color-text-info);">€6 050</td><td></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p style="font-size:11px;color:var(--color-text-secondary);margin:8px 0 0;">Головний координатор бачить такий звіт по всіх контрактах одночасно у зведеному дашборді.</p>
+    </div>
+  </div>
+
+  <div class="sec" id="s-excel">
+    <div class="card">
+      <div class="row"><span class="badge b-coral">Проблема</span><span style="font-size:14px;font-weight:500;">Чому Excel не сходиться</span></div>
+      <div class="g2">
+        <div class="blk"><h4>Ручні помилки при копіюванні</h4><p>Формули ламаються при додаванні рядків. Одна людина редагує — інша не бачить зміни.</p></div>
+        <div class="blk"><h4>Завдатки в окремому файлі</h4><p>Бригадир записав завдаток — бухгалтер не знає. Не підтягується автоматично в підсумок.</p></div>
+        <div class="blk"><h4>Немає статусів і затвердження</h4><p>Незрозуміло — виплачено чи ні. Немає підпису "затверджено". Можна змінити заднім числом.</p></div>
+        <div class="blk"><h4>Версії файлів</h4><p>"Фінальний_v3_справжній_ОНОВЛЕНО.xlsx" — класична ситуація. Немає єдиного джерела правди.</p></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="row"><span class="badge b-teal">План переносу</span><span style="font-size:14px;font-weight:500;">Excel → Odoo покроково</span></div>
+      <div class="step"><div class="sn">1</div><div class="sc"><h4>Підготувати Excel для імпорту</h4><p>Стандартизувати колонки: ПІБ, контракт, місяць, дата, тип запису (години / завдаток / штраф / доплата), сума/кількість. Один рядок = один запис.</p></div></div>
+      <div class="step"><div class="sn">2</div><div class="sc"><h4>Визначити глибину архіву</h4><p>Скільки місяців назад переносимо? Рекомендація: останні 3–6 місяців активних записів. Старіші — архівувати в PDF або окремому файлі.</p></div></div>
+      <div class="step"><div class="sn">3</div><div class="sc"><h4>Спочатку — список працівників і контрактів</h4><p>Імпортувати hr.employee та контракти. Тільки після цього — прив'язані до них записи годин і коригувань.</p></div></div>
+      <div class="step"><div class="sn">4</div><div class="sc"><h4>Імпортувати табелі (account.analytic.line)</h4><p>CSV через Odoo Import. Поля: employee_id, date, unit_amount (години), project_id (контракт), name (нотатка).</p></div></div>
+      <div class="step"><div class="sn">5</div><div class="sc"><h4>Імпортувати фінансові коригування</h4><p>Окрема кастомна модель (через Studio). Тип, сума, дата, працівник, контракт — окремий CSV.</p></div></div>
+      <div class="step"><div class="sn">6</div><div class="sc"><h4>Звірка: Odoo vs Excel</h4><p>Розрахувати підсумки за останній закритий місяць в обох системах. Розбіжності — виправити до go-live. Це критичний крок.</p></div></div>
+      <div class="step"><div class="sn">7</div><div class="sc"><h4>Freeze Excel і перехід</h4><p>З 1-го числа наступного місяця — тільки Odoo. Excel заморожується, зберігається як read-only архів.</p></div></div>
+    </div>
+
+    <div class="card">
+      <div class="row"><span class="badge b-blue">Формат CSV для імпорту табеля</span></div>
+      <div style="background:var(--color-background-secondary);border-radius:var(--border-radius-md);padding:10px 13px;font-family:var(--font-mono);font-size:11px;color:var(--color-text-secondary);overflow-x:auto;">
+        employee_id/name, date, unit_amount, project_id/name, name<br>
+        "Іванченко Петро", 2025-04-01, 8, "Schneider GmbH", "Денна зміна"<br>
+        "Іванченко Петро", 2025-04-02, 8, "Schneider GmbH", "Денна зміна"<br>
+        "Сидоренко Андрій", 2025-04-01, 8, "Schneider GmbH", ""<br>
+        "Сидоренко Андрій", 2025-04-03, 6, "Schneider GmbH", "Коротка зміна"
+      </div>
+      <p style="font-size:11px;color:var(--color-text-secondary);margin:8px 0 0;">Odoo приймає CSV через Settings → Technical → Import або через кнопку Import у списку записів модуля.</p>
+    </div>
+  </div>
+
+  <div class="sec" id="s-setup">
+    <div class="card">
+      <div class="row"><span class="badge b-blue">Обов'язкові модулі</span></div>
+      <div class="g2">
+        <div class="blk"><h4>Timesheets (hr_timesheet)</h4><p>Базовий модуль для внесення годин. Бригадир входить і бачить форму по своєму контракту (project).</p><div class="pill-row"><span class="tag">Денний табель</span><span class="tag">Аналітика годин</span></div></div>
+        <div class="blk"><h4>Project (project)</h4><p>Контракт = Project. Дає Kanban, список завдань, права доступу по проєктах. Бригадир — "project user" тільки свого проєкту.</p><div class="pill-row"><span class="tag">Контроль доступу</span></div></div>
+        <div class="blk"><h4>Payroll (hr_payroll)</h4><p>Розрахунок зарплати на основі табеля. Payslip з формулами: base + rules (доплати/штрафи). Статуси: Draft → Confirm → Done.</p><div class="pill-row"><span class="tag">Salary rules</span><span class="tag">Payslip</span></div></div>
+        <div class="blk"><h4>Odoo Studio</h4><p>Без коду: додати кастомні поля (завдаток, штраф, тип коригування) до контракту і payslip. Потрібна Enterprise ліцензія.</p><div class="pill-row"><span class="tag">Custom fields</span><span class="tag">Custom models</span></div></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="row"><span class="badge b-amber">Налаштування прав доступу</span></div>
+      <div style="overflow-x:auto;">
+        <table class="tbl">
+          <thead><tr><th>Роль</th><th>Timesheets</th><th>Project</th><th>Payroll</th><th>Що бачить</th></tr></thead>
+          <tbody>
+            <tr><td class="bold">Бригадир</td><td>User (свій проєкт)</td><td>User (1 проєкт)</td><td>Немає доступу</td><td>Тільки свій контракт + табель + коригування</td></tr>
+            <tr><td class="bold">Координатор</td><td>Manager</td><td>Manager (свої)</td><td>Officer</td><td>Свої контракти, табелі, попередній перегляд payslip</td></tr>
+            <tr><td class="bold">Головний координатор</td><td>Administrator</td><td>Administrator</td><td>Manager</td><td>Всі контракти, всі табелі, затвердження payslip</td></tr>
+            <tr><td class="bold">Бухгалтер</td><td>Немає</td><td>Немає</td><td>Manager</td><td>Тільки фінальні payslips для виплати</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="row"><span class="badge b-teal">Automated Actions — нагадування</span></div>
+      <div class="step"><div class="sn">1</div><div class="sc"><h4>Нагадування бригадиру</h4><p>Щопонеділка: "Ви не внесли години за минулий тиждень по контракту X". Умова: якщо в понеділок ранок немає записів за попередні 5 днів.</p></div></div>
+      <div class="step"><div class="sn">2</div><div class="sc"><h4>Нагадування координатору</h4><p>1-го числа кожного місяця: "Перевірте та затвердіть табель за попередній місяць по контрактах [список]".</p></div></div>
+      <div class="step"><div class="sn">3</div><div class="sc"><h4>Алерт по невідповідності</h4><p>Якщо кількість годин на тиждень по працівнику = 0, а статус "активний" — автоматичний alert координатору.</p></div></div>
+      <button style="margin-top:8px;font-size:12px;padding:6px 14px;" onclick="sendPrompt('Як налаштувати Automated Actions в Odoo для нагадувань бригадиру про внесення табеля?')">Детальніше про автоматизацію ↗</button>
+    </div>
+  </div>
+</div>
+
+<script>
+function show(id) {
+  document.querySelectorAll('.sec').forEach(s => s.classList.remove('vis'));
+  document.querySelectorAll('.tb').forEach(b => b.classList.remove('on'));
+  document.getElementById('s-' + id).classList.add('vis');
+  event.target.classList.add('on');
+}
+
+function recalc() {
+  const rows = document.querySelectorAll('#timesheet-body tr:not(.total-row)');
+  const cols = 5;
+  let colSums = [0,0,0,0,0];
+  rows.forEach((row, ri) => {
+    const inputs = row.querySelectorAll('input');
+    let rowSum = 0;
+    inputs.forEach((inp, ci) => {
+      const v = parseFloat(inp.value) || 0;
+      rowSum += v;
+      colSums[ci] += v;
+    });
+    const rEl = document.getElementById('r' + ri);
+    if (rEl) rEl.textContent = rowSum.toFixed(rowSum % 1 ? 1 : 0);
+  });
+  let total = 0;
+  colSums.forEach((s, ci) => {
+    const el = document.getElementById('c' + ci);
+    if (el) el.textContent = s.toFixed(s % 1 ? 1 : 0);
+    total += s;
+  });
+  const ct = document.getElementById('ctotal');
+  if (ct) ct.textContent = total.toFixed(total % 1 ? 1 : 0);
+}
+
+function calcPay() {
+  const hrs = parseFloat(document.getElementById('inp-hrs').value) || 0;
+  const rate = parseFloat(document.getElementById('inp-rate').value) || 0;
+  const bonus = parseFloat(document.getElementById('inp-bonus').value) || 0;
+  const adv = parseFloat(document.getElementById('inp-adv').value) || 0;
+  const fine = parseFloat(document.getElementById('inp-fine').value) || 0;
+  const base = hrs * rate;
+  const net = base + bonus - adv - fine;
+  const fmt = v => '€' + v.toLocaleString('uk-UA', {minimumFractionDigits:2, maximumFractionDigits:2});
+  document.getElementById('hrs-total').textContent = hrs;
+  document.getElementById('base').textContent = fmt(base);
+  document.getElementById('bonus').textContent = '+' + fmt(bonus);
+  document.getElementById('advance').textContent = '−' + fmt(adv);
+  document.getElementById('fine').textContent = '−' + fmt(fine);
+  document.getElementById('net').textContent = fmt(net);
+}
+</script>
+</body>
+</html>
